@@ -10,7 +10,6 @@ import RegisterForm from './components/Auth/RegisterForm';
 import { ToastContainer } from 'react-toastify';
 import ProductDetailPage from './pages/ProductDetaiilPage';
 import AdminDashboard from './pages/Admin/AdminDashboard';
-import SellerDashboard from './pages/Seller/SellerDashboard';
 
 
 function App() {

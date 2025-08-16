@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // import React, { useState, useEffect } from 'react';
 // import { Package, ShoppingCart, DollarSign, TrendingUp, Plus, Edit, Eye } from 'lucide-react';
 // import { Product, Order, OrderStatus } from '../../types';
