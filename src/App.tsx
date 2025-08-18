@@ -10,6 +10,7 @@ import RegisterForm from './components/Auth/RegisterForm';
 import { ToastContainer } from 'react-toastify';
 import ProductDetailPage from './pages/ProductDetaiilPage';
 import AdminDashboard from './pages/Admin/AdminDashboard';
+import SellerDashboard from './pages/Seller/SellerDashboard';
 
 
 function App() {
@@ -25,10 +26,10 @@ function App() {
               <Route path="/productsDetail" element={<ProductDetailPage />} />
               <Route path="/login" element={<LoginForm />} />
               <Route path="/profile" element={<AdminDashboard />} />
-              {/* <Route path="/seller/profile" element={<SellerDashboard />} /> */}
+              <Route path="/seller/profile" element={<SellerDashboard />} />
               {/* Thêm route cho các trang đặc thù khác */}
               <Route path="/admin" element={<AdminDashboard />} />
-              {/* <Route path="/seller" element={<SellerDashboard />} /> */}
+              <Route path="/seller" element={<SellerDashboard />} />
               <Route path="/register" element={<RegisterForm />} />
               <Route path="/register-seller" element={<RegisterForm isSeller={true} />} />
             </Routes>

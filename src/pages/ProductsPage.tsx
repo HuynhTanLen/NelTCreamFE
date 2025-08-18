@@ -178,7 +178,7 @@ const fetchCategories = async (): Promise<void> => {
                   >
                     <option value="">Tất cả danh mục</option>
                     {categories.slice(0, 6).map((category) => (
-                      <option key={category.id} value={category.id}>
+                      <option key={category.categoryId} value={category.categoryId}>
                         {category.name}
                       </option>
                     ))}

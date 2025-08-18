@@ -8,7 +8,7 @@ export interface ApiResponse<T> {
 }
 
 export interface PageResponse<T> {
-  content: T[];
+  data: T[];
   totalElements: number;
   totalPages: number;
   number: number; // current page
@@ -30,6 +30,7 @@ export interface Seller {
   id: string;
   email: string;
   user: User;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,7 +45,7 @@ export interface AuthState {
 
 // Product Types
 export interface Category {
-  id: number;
+  categoryId: number;
   name: string;
   createdAt: string;
   updatedAt: string;

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Package, ShoppingCart, TrendingUp, Plus, Edit, Trash2, Check, X } from 'lucide-react';
+import { Users, Package, ShoppingCart, TrendingUp, Plus } from 'lucide-react';
 import { Category, Seller } from '../../types';
 import { adminService } from '../../services/adminService';
-import { productService } from '../../services/productService';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
+import { sellerService } from '../../services/SellerService';
 
 export default function AdminDashboard() {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [sellers, setSellers] = useState<Seller[]>([]);
+  const [activeSellers, setActiveSellers] = useState<Seller[]>([]);
   const [pendingSellers, setPendingSellers] = useState<Seller[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'categories' | 'sellers'>('overview');
@@ -20,98 +20,87 @@ export default function AdminDashboard() {
   }, []);
 
   const fetchData = async () => {
+  setLoading(true);
+  try {
+    // Categories
+    const categoriesRes = await adminService.getCategories();
+    if (categoriesRes.data.code === 1000) setCategories(categoriesRes.data.result);
+
+    // Active Sellers
+    const activeRes = await sellerService.getAllActiveSellers();
+    setActiveSellers(activeRes.result?.data || []);
+    console.log("Active sellers:", activeRes.result?.data);
+
+    // Pending Sellers
+    const pendingRes = await sellerService.getAllNonActiveSellers();
+    setPendingSellers(pendingRes.result?.data || []);
+    console.log("Pending sellers:", pendingRes.result?.data);
+
+  } catch (error) {
+    console.error('Failed to fetch admin data:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+  // ----- Categories -----
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return;
     try {
-      // Fetch categories from API
-      const categoriesResponse = await adminService.getCategories();
-      if (categoriesResponse.data.code === 1000) {
-        setCategories(categoriesResponse.data.result);
-        console.log(categoriesResponse.data.result);
-        
+      const res = await adminService.createCategory({ name: newCategoryName });
+      if (res.data.code === 1000 && res.data.result) {
+        setCategories([...categories, res.data.result]);
+        alert('Tạo danh mục thành công!');
       }
-      
-      // Mock sellers data - replace with actual API call when available
-      setPendingSellers([]); // Mock empty pending sellers
+      setNewCategoryName('');
+      setShowAddCategory(false);
     } catch (error) {
-      console.error('Failed to fetch admin data:', error);
-    } finally {
-      setLoading(false);
+      console.error(error);
+      alert('Tạo danh mục thất bại!');
     }
   };
 
-  const handleCreateCategory = async () => {
-  if (!newCategoryName.trim()) return;
-
-  try {
-    const response = await adminService.createCategory({ name: newCategoryName });
-
-    if (response.data.code === 1000 && response.data.result) { // ✅ check result có null không
-      setCategories([...categories, response.data.result]);
-      alert('Tạo danh mục thành công!');
-    }
-
-    setNewCategoryName('');
-    setShowAddCategory(false);
-  } catch (error) {
-    console.error('Failed to create category:', error);
-    alert('Tạo danh mục thất bại!');
-  }
-};
-
-
-  // Update
-      const handleUpdateCategory = async () => {
-  if (!editingCategory || !editingCategory.name.trim()) return;
-
-  try {
-    const response = await adminService.updateCategory(
-      editingCategory.id,
-      { name: editingCategory.name }
-    );
-
-    if (response.data.code === 1000 && response.data.result) { // ✅ check null
-      setCategories(categories.map(cat =>
-        cat.id === editingCategory.id ? response.data.result : cat
-      ));
+  const handleUpdateCategory = async (category: Category) => {
+    try {
+      await adminService.updateCategory(category.categoryId, { name: category.name });
       alert('Cập nhật danh mục thành công!');
+    } catch (error) {
+      console.error(error);
+      alert('Cập nhật thất bại!');
     }
-
-    setEditingCategory(null);
-  } catch (error) {
-    console.error('Failed to update category:', error);
-    alert('Cập nhật danh mục thất bại!');
-  }
-};
-
-
+  };
 
   const handleDeleteCategory = async (categoryId: number) => {
-  if (!window.confirm('Bạn có chắc chắn muốn xóa danh mục này?')) return;
-
-  try {
-    const response = await adminService.deleteCategory(categoryId);
-
-    if (response.data.code === 1000) {
-      setCategories(categories.filter(cat => cat.id !== categoryId));
-      alert('Xóa danh mục thành công!');
-    }
-  } catch (error) {
-    console.error('Failed to delete category:', error);
-    alert('Xóa danh mục thất bại!');
-  }
-};
-
-
-  const handleApproveSeller = async (sellerId: string, approved: boolean) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa danh mục này?')) return;
     try {
-      // Mock implementation
-      if (approved) {
-        alert('Đã phê duyệt seller thành công!');
-      } else {
-        alert('Đã từ chối seller!');
+      const res = await adminService.deleteCategory(categoryId);
+      if (res.data.code === 1000) {
+        setCategories(categories.filter(c => c.categoryId !== categoryId));
+        alert('Xóa danh mục thành công!');
       }
-      setPendingSellers(pendingSellers.filter(s => s.id !== sellerId));
+    } catch (error) {
+      console.error(error);
+      alert('Xóa danh mục thất bại!');
+    }
+  };
+
+  // ----- Sellers -----
+   const handleActiveSeller = async (sellerId: number, isActive: boolean) => {
+    try {
+      await sellerService.approveSeller(sellerId, { approved: isActive });
+      alert(isActive ? 'Đã phê duyệt seller!' : 'Đã từ chối seller!');
+      
+      // Cập nhật state
+      if (isActive) {
+        const seller = pendingSellers.find(s => s.id === sellerId);
+        if (seller) setActiveSellers(prev => [...prev, seller]);
+      }
+      setPendingSellers(prev => prev.filter(s => s.id !== sellerId));
     } catch (error) {
       console.error('Failed to approve seller:', error);
+      alert('Phê duyệt thất bại!');
     }
   };
 
@@ -139,7 +128,7 @@ export default function AdminDashboard() {
               { id: 'overview', name: 'Tổng quan', icon: TrendingUp },
               { id: 'categories', name: 'Danh mục', icon: Package },
               { id: 'sellers', name: 'Sellers', icon: Users }
-            ].map((tab) => (
+            ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
@@ -158,54 +147,40 @@ export default function AdminDashboard() {
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
-          <div className="space-y-8">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <Users className="w-8 h-8 text-blue-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Tổng Users</p>
-                    <p className="text-2xl font-bold text-gray-900">1,234</p>
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center">
+                <Users className="w-8 h-8 text-blue-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Tổng Users</p>
+                  <p className="text-2xl font-bold text-gray-900">1,234</p>
                 </div>
               </div>
-
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <Package className="w-8 h-8 text-green-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Sản phẩm</p>
-                    <p className="text-2xl font-bold text-gray-900">567</p>
-                  </div>
+            </div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center">
+                <Package className="w-8 h-8 text-green-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Sản phẩm</p>
+                  <p className="text-2xl font-bold text-gray-900">567</p>
                 </div>
               </div>
-
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <ShoppingCart className="w-8 h-8 text-purple-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Đơn hàng</p>
-                    <p className="text-2xl font-bold text-gray-900">89</p>
-                  </div>
+            </div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center">
+                <ShoppingCart className="w-8 h-8 text-purple-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Đơn hàng</p>
+                  <p className="text-2xl font-bold text-gray-900">89</p>
                 </div>
               </div>
-
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <TrendingUp className="w-8 h-8 text-yellow-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Doanh thu</p>
-                    <p className="text-2xl font-bold text-gray-900">$12,345</p>
-                  </div>
+            </div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center">
+                <TrendingUp className="w-8 h-8 text-yellow-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Doanh thu</p>
+                  <p className="text-2xl font-bold text-gray-900">$12,345</p>
                 </div>
               </div>
             </div>
@@ -214,202 +189,141 @@ export default function AdminDashboard() {
 
         {/* Categories Tab */}
         {activeTab === 'categories' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-900">Quản lý danh mục</h2>
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Quản lý danh mục</h2>
               <button
                 onClick={() => setShowAddCategory(true)}
-                className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
               >
-                <Plus className="w-4 h-4" />
-                <span>Thêm danh mục</span>
+                <Plus className="w-4 h-4" /> Thêm danh mục
               </button>
             </div>
-
-            {/* Add Category Form */}
             {showAddCategory && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Thêm danh mục mới</h3>
-                <div className="flex space-x-4">
-                  <input
-                    type="text"
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    placeholder="Tên danh mục"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <button
-                    onClick={handleCreateCategory}
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
-                  >
-                    Tạo
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowAddCategory(false);
-                      setNewCategoryName('');
-                    }}
-                    className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
-                  >
-                    Hủy
-                  </button>
-                </div>
+              <div className="bg-white p-6 rounded shadow mb-4">
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={e => setNewCategoryName(e.target.value)}
+                  placeholder="Tên danh mục"
+                  className="border px-3 py-2 rounded w-full mb-2"
+                />
+                <button onClick={handleCreateCategory} className="bg-green-600 text-white px-4 py-2 rounded mr-2">
+                  Tạo
+                </button>
+                <button onClick={() => setShowAddCategory(false)} className="bg-gray-600 text-white px-4 py-2 rounded">
+                  Hủy
+                </button>
               </div>
             )}
 
-            {/* Categories List */}
-            <div className="p-6">
-      <h2 className="text-2xl font-bold mb-4">Quản lý danh mục</h2>
-
-      <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="px-4 py-2 text-left border">ID</th>
-            <th className="px-4 py-2 text-left border">Tên danh mục</th>
-            <th className="px-4 py-2 text-left border">Ngày tạo</th>
-            <th className="px-4 py-2 text-left border">Thao tác</th>
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-              {categories.length > 0 ? (
-                categories.map((category, index) => (
-                  <tr key={category.id} className="border-b">
-                    <td className="px-4 py-2 border">{category.id}</td>
-
-                    {/* Ô input để sửa tên danh mục */}
+            <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="px-4 py-2 border">ID</th>
+                  <th className="px-4 py-2 border">Tên danh mục</th>
+                  <th className="px-4 py-2 border">Ngày tạo</th>
+                  <th className="px-4 py-2 border text-center">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categories.map((category, idx) => (
+                  <tr key={category.categoryId} className="border-b">
+                    <td className="px-4 py-2 border">{category.categoryId}</td>
                     <td className="px-4 py-2 border">
                       <input
                         type="text"
-                        value={category.name} // dùng value thay vì defaultValue
-                        onChange={(e) => {
+                        value={category.name}
+                        onChange={e => {
                           const newCategories = [...categories];
-                          newCategories[index] = {
-                            ...newCategories[index],
-                            name: e.target.value,
-                          };
-                          setCategories(newCategories); // cập nhật state
+                          newCategories[idx] = { ...newCategories[idx], name: e.target.value };
+                          setCategories(newCategories);
                         }}
-                        className="border rounded px-2 py-1 w-full"
+                        className="border px-2 py-1 w-full"
                       />
                     </td>
-
                     <td className="px-4 py-2 border">
-                      {category.createdAt
-                        ? new Date(category.createdAt).toLocaleDateString("vi-VN")
-                        : "--"}
+                      {category.createdAt ? new Date(category.createdAt).toLocaleDateString('vi-VN') : '--'}
                     </td>
-
-                    <td className="px-4 py-2 border text-center">
-                      <button
-                        className="px-3 py-1 bg-green-500 text-white rounded"
-                        onClick={() => console.log("Lưu:", category)} // TODO: gọi API update
-                      >
+                    <td className="px-4 py-2 border text-center space-x-2">
+                      <button onClick={() => handleUpdateCategory(category)} className="px-3 py-1 bg-green-500 text-white rounded">
                         ✔
+                      </button>
+                      <button onClick={() => handleDeleteCategory(category.categoryId)} className="px-3 py-1 bg-red-500 text-white rounded">
+                        ✖
                       </button>
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={4} className="text-center py-4 text-gray-500 italic">
-                    Không có danh mục nào
-                  </td>
-                </tr>
-              )}
-            </tbody>
-      </table>
-    </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
         {/* Sellers Tab */}
         {activeTab === 'sellers' && (
           <div className="space-y-6">
-            <h2 className="text-xl font-bold text-gray-900">Quản lý Sellers</h2>
-
             {/* Pending Sellers */}
-            {pendingSellers.length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">
-                  Sellers chờ phê duyệt ({pendingSellers.length})
-                </h3>
-                <div className="space-y-4">
-                  {pendingSellers.map((seller) => (
-                    <div key={seller.id} className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg">
-                      <div>
-                        <p className="font-medium text-gray-900">{seller.user.fullName}</p>
-                        <p className="text-sm text-gray-600">{seller.email}</p>
-                        <p className="text-xs text-gray-500">
-                          Đăng ký: {new Date(seller.createdAt).toLocaleDateString('vi-VN')}
-                        </p>
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleApproveSeller(seller.id, true)}
-                          className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
-                        >
-                          Phê duyệt
-                        </button>
-                        <button
-                          onClick={() => handleApproveSeller(seller.id, false)}
-                          className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
-                        >
-                          Từ chối
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Active Sellers */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Sellers đã phê duyệt ({sellers.length})
-                </h3>
-              </div>
+            <div>
+              <h3 className="text-lg font-medium mb-2">
+                Sellers chưa phê duyệt ({pendingSellers?.length || 0})
+              </h3>
+               {pendingSellers?.length > 0 ? (
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Seller
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ngày tham gia
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Trạng thái
-                    </th>
+                    <th>Seller</th>
+                    <th>Email</th>
+                    <th>Ngày đăng ký</th>
+                    <th>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {sellers.map((seller) => (
-                    <tr key={seller.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {seller.user.fullName}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {seller.email}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(seller.createdAt).toLocaleDateString('vi-VN')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                          Hoạt động
-                        </span>
+                        {pendingSellers.map((seller) => (
+                    <tr key={seller.id} className="border-b">
+                      <td className="px-4 py-2 border">{seller.user?.fullName}</td>
+                      <td className="px-4 py-2 border">{seller.email}</td>
+                      <td className="px-4 py-2 border">{new Date(seller.createdAt).toLocaleDateString('vi-VN')}</td>
+                      <td className="px-4 py-2 border text-center space-x-2">
+                        <button onClick={() => handleApproveSeller(seller.id, true)} className="px-3 py-1 bg-green-500 text-white rounded">✔</button>
+                        <button onClick={() => handleApproveSeller(seller.id, false)} className="px-3 py-1 bg-red-500 text-white rounded">✖</button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              ) : <p>Không có seller chờ duyệt</p>}
+            </div>
+
+            {/* Active Sellers */}
+            <div>
+              <h3 className="text-lg font-medium mb-2">Sellers đã phê duyệt ({activeSellers?.length || 0})</h3>
+              {activeSellers?.length > 0 ? (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th>Seller</th>
+                    <th>Email</th>
+                    <th>Ngày tham gia</th>
+                    <th>Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                 {activeSellers.map((seller) => (
+                      <tr key={seller.id} className="border-b">
+                        <td className="px-4 py-2 border">{seller.user?.fullName}</td>
+                        <td className="px-4 py-2 border">{seller.email}</td>
+                        <td className="px-4 py-2 border">{new Date(seller.createdAt).toLocaleDateString('vi-VN')}</td>
+                        <td className="px-4 py-2 border">
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                            Đã phê duyệt
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+               ) : <p>Chưa có seller nào được duyệt</p>}
             </div>
           </div>
         )}

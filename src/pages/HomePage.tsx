@@ -183,8 +183,8 @@ export default function HomePage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {categories.slice(0, 6).map((category) => (
               <Link
-                key={category.id}
-                to={`/products?category=${category.id}`}
+                key={category.categoryId}
+                to={`/products?category=${category.categoryId}`}
                 className="group bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center hover:shadow-md transition-shadow"
               >
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-blue-200 transition-colors">
